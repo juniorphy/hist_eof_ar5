@@ -1,4 +1,4 @@
-    #!/bin/bash
+#!/bin/bash
 DIR=`pwd`
 
 #for MODEL in bccr_bcm2_0 cccma_cgcm3_1 cccma_cgcm3_1_t63 cnrm_cm3 csiro_mk3_0 csiro_mk3_5 gfdl_cm2_0 gfdl_cm2_1 giss_aom giss_model_e_h giss_model_e_r iap_fgoals1_0_g ingv_echam4 inmcm3_0 ipsl_cm4 miroc3_2_hires miroc3_2_medres miub_echo_g mpi_echam5 mri_cgcm2_3_2a ncar_ccsm3_0 ncar_pcm1 ukmo_hadcm3 ukmo_hadgem1; do 
@@ -7,6 +7,8 @@ for DUMP in `ls -d */ ` ; do
  
 MODEL=${DUMP:0:-1}
 
+cd ${DIR}
+
 cp ${DIR}/grid*.trop.nc ${MODEL}
 
 cd $MODEL
@@ -14,14 +16,15 @@ echo MODEL $MODEL
 fin=`ls -1 tos_Omon_*.nc`
 echo $fin
 
-cdo setcalendar,standard -seldate,1970-12-1,1999-12-31 -remapbil,grid.ersst.atlantico.trop.nc $fin "g.errsst.$fin"
+#cdo setcalendar,standard -seldate,1970-01-1,1999-12-31 -remapbil,grid.ersst.atlantico.trop.nc $fin "g.errsst.$fin"
 
 #$CDO genbil,${GRID_TARGET} ${FILEIN} weights.nc
 #$CDO remap,${GRID_TARGET},weights.nc ${FILEIN} ${FILEOUT}.T42.nc
 
-mkdir dtred
+#mkdir dtred
 cd dtred
 cdo detrend ../g.errsst.$fin dtred.errsst.${fin}
+rm -fv *space*.txt
 
 cat << EOF > eof.jnl 
 
@@ -81,6 +84,12 @@ go variance
 fill/lev=(-inf)(-0.8,0.8,0.2)(inf)/pal=inv_white_centered_junior/title="EOF1 - (\$v1)%" correl
 contour/lev=(-inf)(-0.8,0.8,0.1)(inf)/o correl ; go fland
 frame/file=eof1.dtred.annual.${MODEL}.correl.gif
+let co = if correl le 10 then correl else 999.
+set var/bad=999. co
+save/clobber/file=correl.${MODEL}.eof1.nc co
+sp lats4d.sh -format grads_grib -i correl.${MODEL}.eof1.nc -o correl.${MODEL}.eof1
+
+!repeat/i=1:45 (repeat/j=1:25 ( list/nohead/q/append/file=${MODEL}.space1.txt co ))
 
 let q = ANOM[d=2]
 let p = tfunc[d=3,i=2,gt=q@ASN]
@@ -89,35 +98,55 @@ go variance
 fill/lev=(-inf)(-0.8,0.8,0.2)(inf)/pal=inv_white_centered_junior/title="EOF2 - (\$v2)%" correl
 contour/lev=(-inf)(-0.8,0.8,0.1)(inf)/o correl ; go fland
 frame/file=eof2.dtred.annual.${MODEL}.correl.gif
+let co = if correl le 10 then correl else 999.
+set var/bad=999. co
+save/clobber/file=correl.${MODEL}.eof2.nc co
+sp lats4d.sh -format grads_grib -i correl.${MODEL}.eof2.nc -o correl.${MODEL}.eof2
 
-!inicio de comentario
-!let q = ANOM[d=2]
-!let p = tfunc[d=3,i=3,gt=q@ASN]
-!go variance
-!set viewport ll                                                                                                                 
-!fill/lev=(-inf)(-0.8,0.8,0.1)(inf)/pal=inv_white_centered_junior/title="EOF3 - (\$v3)%" correl
-!contour/lev=(-inf)(-0.8,0.8,0.1)(inf)/o correl ; go fland
+!repeat/i=1:45 (repeat/j=1:25 ( list/nohead/append/file=${MODEL}.space2.txt co ))
 
-!let q = ANOM[d=2]
-!let p = tfunc[d=3,i=4,gt=q@ASN]
-!go variance
-!set viewport lr                                                                                                                 
-!fill/lev=(-inf)(-0.8,0.8,0.1)(inf)/pal=inv_white_centered_junior/title="EOF4 - (\$v4)%" correl
-!contour/lev=(-inf)(-0.8,0.8,0.1)(inf)/o correl ; go fland
-!frame/file=eof.dtred.annual.${MODEL}.correl.gif
+!---------------------------------------------------------------------------------------
+!---------------------------------------------------------------------------------------
+
+cancel mode logo
+set win/asp=0.75/size=2.
+SET MODE LATIT_LABEL
+SET MODE LONG_LABEL
+!plotting two leading EOF gray scale
+let q = ANOM[d=2]
+let p = tfunc[d=3,i=1,gt=q@ASN]
+
+go variance
+fill/nolab/lev=(-inf)(-0.8,0.8,0.1)(inf)/pal=inverse_grayscale_jr correl
+contour/o/nolab/sigdig=1/nolab/size=0.1/spacing=2/lev=(-inf)(-0.8,0.8,0.1)(inf) correl ; go fland 5
+
+lab/nou \` (\$ppl\$xlen)/2 \`,\` (\$ppl\$xlen)-3. \`, 0, 0, 0.22,@ACEOF1 - ${MODEL} - (\$v1)%
+frame/file=eof1.ar5.dtred.annual.${MODEL}.gif
+
+let q = ANOM[d=2]
+let p = tfunc[d=3,i=2,gt=q@ASN]
+
+go variance
+fill/nolab/lev=(-inf)(-0.8,0.8,0.1)(inf)/pal=inverse_grayscale_jr correl
+contour/o/sigdig=1/size=0.1/spacing=2/nolab/lev=(-inf)(-0.8,0.8,0.1)(inf)/pal=inverse_grayscale_jr correl ; go fland 5
+
+lab/nou \` (\$ppl\$xlen)/2 \`,\` (\$ppl\$xlen)-3. \`, 0, 0, 0.22,@ACEOF2 - ${MODEL} - (\$v2)%
+frame/file=eof2.ar5.dtred.annual.${MODEL}.gif
+
+!---------------------------------------------------------------------------------------
+!---------------------------------------------------------------------------------------
 
 
 !cancel viewport
 !use eof.${MODEL}.tfunc.nc
 
-
 !set viewport ul
 !plot/vlim=-3:3/title="PC1 - (\$v1)% " tfunc[i=1,d=3]
-!list/form=(f10.5)/nohead/clobber/file=PC1.${MODEL}.txt tfunc[i=1,d=3]
+list/q/form=(f10.5)/nohead/clobber/file=PC1.${MODEL}.txt tfunc[i=1,d=3]
 
 !set viewport ur
 !plot/vlim=-3:3/title="PC2 - (\$v2)%" tfunc[i=2,d=3]
-!list/form=(f10.5)/nohead/clobber/file=PC2.${MODEL}.txt tfunc[i=2,d=3]
+list/q/form=(f10.5)/nohead/clobber/file=PC2.${MODEL}.txt tfunc[i=2,d=3]
 !set viewport ll                                                                                                                 
 !plot/vlim=-3:3/title="PC3 - (\$v3)%" tfunc[i=3,d=3]
 !list/form=(f10.5)/nohead/clobber/file=PC3.${MODEL}.txt tfunc[i=3,d=3]
@@ -130,12 +159,14 @@ EOF
 
 ferret -gif -script eof.fig.jnl
 
+continue
+
 # processamento das EOF Sazonais...
 
-cdo seasmean -selseas,1 -seldate,1970-12-01,1999-11-30 anom.$MODEL.70.99.nc $MODEL.DJF.70.99.nc
-cdo seasmean -selseas,2 -seldate,1970-12-01,1999-11-30 anom.$MODEL.70.99.nc $MODEL.MAM.70.99.nc
-cdo seasmean -selseas,3 -seldate,1970-12-01,1999-11-30 anom.$MODEL.70.99.nc $MODEL.JJA.70.99.nc
-cdo seasmean -selseas,4 -seldate,1970-12-01,1999-11-30 anom.$MODEL.70.99.nc $MODEL.SON.70.99.nc
+#cdo seasmean -selseas,1 -seldate,1970-12-01,1999-11-30 anom.$MODEL.70.99.nc $MODEL.DJF.70.99.nc
+#cdo seasmean -selseas,2 -seldate,1970-12-01,1999-11-30 anom.$MODEL.70.99.nc $MODEL.MAM.70.99.nc
+#cdo seasmean -selseas,3 -seldate,1970-12-01,1999-11-30 anom.$MODEL.70.99.nc $MODEL.JJA.70.99.nc
+#cdo seasmean -selseas,4 -seldate,1970-12-01,1999-11-30 anom.$MODEL.70.99.nc $MODEL.SON.70.99.nc
 
 #skip(){
 for TRI in DJF MAM JJA SON ; do
@@ -143,9 +174,9 @@ for TRI in DJF MAM JJA SON ; do
 echo $TRI
 
 cat << EOF > eof.${TRI}.jnl 
-say aqui
+
 set data ${MODEL}.${TRI}.70.99.nc
-say aqui
+
 let stats = EOF_STAT(anom,0.8)
 
 let space = EOF_SPACE(anom,0.8)
@@ -217,6 +248,7 @@ frame/file=eof2.dtred.${TRI}.${MODEL}.correl.gif
 !frame/file=eof.dtred.${TRI}.${MODEL}.correl.gif
 
 cancel viewport
+
 
 use eof.${TRI}.${MODEL}.tfunc.nc
 
